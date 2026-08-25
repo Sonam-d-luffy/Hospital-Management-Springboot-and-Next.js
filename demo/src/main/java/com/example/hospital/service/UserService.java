@@ -1,9 +1,13 @@
 package com.example.hospital.service;
 
+import java.time.LocalDateTime;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.example.hospital.entities.OTPVerification;
 import com.example.hospital.entities.User;
+import com.example.hospital.repositories.OtpVerificationRepository;
 import com.example.hospital.repositories.UserRepository;
 
 
@@ -15,16 +19,17 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GeocodingService geocodingService;
-
+    private final OtpVerificationRepository otpRepository;
     public UserService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService,GeocodingService geocodingService) {
+            JwtService jwtService,GeocodingService geocodingService,OtpVerificationRepository otpRepository) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.geocodingService = geocodingService;
+        this.otpRepository = otpRepository;
     }
     public User register(User user) {
 
@@ -45,15 +50,26 @@ public class UserService {
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new IllegalArgumentException("Email already exists");
         }
+        OTPVerification otp = otpRepository.findByEmail(user.getEmail())
+        .orElseThrow(() ->
+            new IllegalArgumentException("Please verify your email first"));
+
+if (!otp.isVerified()) {
+    throw new IllegalArgumentException("Email not verified");
+}
+if (otp.getExpiryTime().isBefore(LocalDateTime.now())) {
+    throw new IllegalArgumentException("OTP has expired");
+}
         double[] coordinates = geocodingService.getCoordinates(user.getAddress());
         user.setLatitude(coordinates[0]);
         user.setLongitude(coordinates[1]);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-
+        otpRepository.delete(otp);
+        otpRepository.flush();
         return userRepository.save(user);
     }
 
-    public String login(String email, String password) {
+    public User login(String email, String password) {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() ->
@@ -63,6 +79,6 @@ public class UserService {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
-        return jwtService.generateToken(user.getEmail());
+        return userRepository.save(user);
     }
 }

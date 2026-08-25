@@ -52,13 +52,13 @@ public class HospitalController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(
+    public ResponseEntity<Hospital> login(
             @RequestParam String email,
             @RequestParam String password) {
 
-        String token = hospitalService.login(email, password);
+        Hospital hospital = hospitalService.login(email, password);
 
-        return ResponseEntity.ok(token);
+        return ResponseEntity.ok(hospital);
     }
 
     @GetMapping("/nearby/{id}")
@@ -88,4 +88,24 @@ public class HospitalController {
             hospitalService.getHospialDetail(id)
         );
     }
+
+     @GetMapping("/getHospital")
+     public ResponseEntity<Map<String,Object>> getHospitalNearby(
+        @RequestParam String address,
+        Pageable pageable
+    ){
+        Page<Hospital> page = hospitalService.getHospital(address, pageable);
+
+    Map<String,Object> response = new HashMap<>();
+
+    response.put("hospitals", page.getContent());
+    response.put("currentPage", page.getNumber());
+    response.put("totalPages", page.getTotalPages());
+    response.put("totalHospitals", page.getTotalElements());
+    response.put("hasNext", page.hasNext());
+    response.put("hasPrevious", page.hasPrevious());
+
+    return ResponseEntity.ok(response);
+    }
+
 }

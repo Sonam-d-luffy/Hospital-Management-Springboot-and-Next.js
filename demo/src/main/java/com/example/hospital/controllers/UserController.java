@@ -2,7 +2,11 @@ package com.example.hospital.controllers;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.hospital.entities.User;
 import com.example.hospital.service.UserService;
@@ -29,12 +33,12 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(
+    public ResponseEntity<User> login(
             @RequestParam String email,
             @RequestParam String password) {
 
-        String token = userService.login(email, password);
+        User user = userService.login(email, password);
 
-        return ResponseEntity.ok(token);
+        return ResponseEntity.ok(user);
     }
 }

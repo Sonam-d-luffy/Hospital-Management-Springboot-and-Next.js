@@ -1,11 +1,13 @@
 package com.example.hospital.service;
-import org.springframework.stereotype.Service;
+import java.util.List;
 
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.example.hospital.entities.Doctor;
+import com.example.hospital.entities.Hospital;
 import com.example.hospital.repositories.DoctorRepository;
 import com.example.hospital.repositories.HospitalRepository;
-import com.example.hospital.entities.Hospital;
-import com.example.hospital.entities.Doctor;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class DoctorService{
@@ -31,5 +33,22 @@ public class DoctorService{
         String imageUrl = cloudinaryService.uploadImage(image);
         doctor.setImage(imageUrl);
         return doctorRepository.save(doctor);
+    }
+    public List<Doctor> getDoctors(Long hospitalId){
+        Hospital hospital = hospitalRepository.findById(hospitalId).orElseThrow(() -> new IllegalArgumentException("Hospital not found"));
+        List<Doctor> doctors = hospital.getDoctors();
+        return doctors;
+    }
+    
+    public Doctor getDoctorDetails(Long id){
+        Doctor doctor = doctorRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Hospital not found"));
+        return doctorRepository.save(doctor);
+    }
+    public void deleteDoctor(Long id){
+         if (!doctorRepository.existsById(id)) {
+            throw new RuntimeException("Doctor not found");
+        }
+
+        doctorRepository.deleteById(id);
     }
 }

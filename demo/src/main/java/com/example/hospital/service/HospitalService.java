@@ -1,6 +1,7 @@
 package com.example.hospital.service;
 
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -11,8 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.hospital.entities.Hospital;
+import com.example.hospital.entities.OTPVerification;
 import com.example.hospital.entities.User;
 import com.example.hospital.repositories.HospitalRepository;
+import com.example.hospital.repositories.OtpVerificationRepository;
 import com.example.hospital.repositories.UserRepository;
 
 @Service
@@ -22,12 +25,14 @@ public class HospitalService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GeocodingService geocodingService;
+       private final OtpVerificationRepository otpRepository;
     private final UserRepository userRepository;
 public HospitalService(HospitalRepository hospitalRepository,
                        CloudinaryService cloudinaryService,
                        JwtService jwtService,
                        PasswordEncoder passwordEncoder,
-                       GeocodingService geocodingService, UserRepository userRepository) {
+                       GeocodingService geocodingService, UserRepository userRepository,
+                       OtpVerificationRepository otpRepository) {
 
     this.hospitalRepository = hospitalRepository;
     this.cloudinaryService = cloudinaryService;
@@ -35,6 +40,7 @@ public HospitalService(HospitalRepository hospitalRepository,
     this.jwtService = jwtService;
     this.geocodingService = geocodingService;
     this.userRepository = userRepository;
+    this.otpRepository = otpRepository;
 }
 
     public Hospital createHospital(Hospital hospital ,MultipartFile image) {
@@ -64,18 +70,31 @@ public HospitalService(HospitalRepository hospitalRepository,
         throw new IllegalArgumentException(
                 "Registration number already exists");
     }
-    String imageUrl = cloudinaryService.uploadImage(image);
-    hospital.setImage(imageUrl);
+    
+    OTPVerification otp = otpRepository.findByEmail(hospital.getEmail())
+        .orElseThrow(() ->
+            new IllegalArgumentException("Please verify your email first"));
+
+if (!otp.isVerified()) {
+    throw new IllegalArgumentException("Email not verified");
+}
+if (otp.getExpiryTime().isBefore(LocalDateTime.now())) {
+    throw new IllegalArgumentException("OTP has expired");
+}
+String imageUrl = cloudinaryService.uploadImage(image);
     double[] coordinates = geocodingService.getCoordinates(hospital.getAddress());
 
+    hospital.setImage(imageUrl);
 hospital.setLatitude(coordinates[0]);
 hospital.setLongitude(coordinates[1]);
     hospital.setPassword(passwordEncoder.encode(hospital.getPassword()));
+    otpRepository.delete(otp);
+    otpRepository.flush();
     return hospitalRepository.save(hospital);
     
 }
 
-public String login(String email, String password) {
+public Hospital login(String email, String password) {
 
         Hospital user = hospitalRepository.findByEmail(email)
                 .orElseThrow(() ->
@@ -85,7 +104,7 @@ public String login(String email, String password) {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
-        return jwtService.generateToken(user.getEmail());
+        return hospitalRepository.save(user);
     }
 
     public Page<Hospital> getNearbyHospital(Long id, Pageable pageable){
@@ -107,6 +126,38 @@ public String login(String email, String password) {
     if (start >= nearby.size()) {
     return new PageImpl<>(List.of(), pageable, nearby.size());
 }
+int end = Math.min(start + pageable.getPageSize(), nearby.size());
+
+    List<Hospital> pageContent = nearby.subList(start, end);
+
+    return new PageImpl<>(pageContent, pageable, nearby.size());
+    }
+
+public Page<Hospital> getHospital(String address , Pageable pageable){
+    if (address == null || address.isBlank()) {
+    throw new IllegalArgumentException("Address is required");
+}
+    double[] coords = geocodingService.getCoordinates(address);
+
+double userLat = coords[0];
+double userLong = coords[1];
+List<Hospital> nearby = hospitalRepository.findAll()
+        .stream()
+        .filter(hospital ->
+                calculateDistance(
+                        userLat,
+                        userLong,
+                        hospital.getLatitude(),
+                        hospital.getLongitude()
+                ) <= 50)
+        .toList();
+
+        int start = (int) pageable.getOffset();
+
+if (start >= nearby.size()) {
+       return new PageImpl<>(List.of(), pageable, nearby.size());
+}
+
 
     int end = Math.min(start + pageable.getPageSize(), nearby.size());
 

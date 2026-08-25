@@ -9,4 +9,5 @@ import com.example.hospital.entities.Doctor;
 public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     Optional<Doctor> findByEmail(String email);
     boolean existsByEmail(String email);
+    boolean existsById(Long id);
 }
