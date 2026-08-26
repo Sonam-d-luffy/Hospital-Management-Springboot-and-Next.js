@@ -13,28 +13,40 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class EmailService {
 
-    @Value("${resend.api-key}")
+    @Value("${brevo.api-key}")
     private String apiKey;
 
-    @Value("${resend.sender-email}")
+    @Value("${brevo.sender-email}")
     private String senderEmail;
+
+    @Value("${brevo.sender-name}")
+    private String senderName;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
     private void sendEmail(String to, String subject, String content) {
 
-        String url = "https://api.resend.com/emails";
+        String url = "https://api.brevo.com/v3/smtp/email";
 
         HttpHeaders headers = new HttpHeaders();
-
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        headers.set("api-key", apiKey);
+
+        Map<String, String> sender = Map.of(
+                "name", senderName,
+                "email", senderEmail
+        );
+
+        Map<String, String> recipient = Map.of(
+                "email", to
+        );
 
         Map<String, Object> requestBody = Map.of(
-                "from", senderEmail,
-                "to", List.of(to),
+                "sender", sender,
+                "to", List.of(recipient),
                 "subject", subject,
-                "text", content
+                "textContent", content
         );
 
         HttpEntity<Map<String, Object>> request =
